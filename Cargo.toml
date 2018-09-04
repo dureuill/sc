@@ -1,0 +1,6 @@
+[package]
+name = "sc"
+version = "0.1.0"
+authors = ["Louis Dureuil <louis.dureuil@xinra.net>"]
+
+[dependencies]
