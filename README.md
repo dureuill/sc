@@ -56,7 +56,7 @@ Since directly storing a reference doesn't work, what about using raw pointers? 
 Let's modify our impl to use raw pointers:
 
 ```rust
-use core::mem;
+use std::mem;
 
 struct Sc<T> {
     val : *const T
@@ -69,7 +69,7 @@ impl<T> Sc<T> {
 
     fn get<'a>(&'a self) -> Option<&'a T> {
         unsafe {
-            Some(mem::transmute(val))
+            Some(mem::transmute(self.val))
         }
     }
 }
@@ -82,8 +82,9 @@ Well, this will compile. But we used unsafe, so we should wonder how unsafe this
 ```rust
 let sc;
 {
-    let s = String::from("toto");
+    let s = String::from("foo");
     sc = Sc::new(&s);
+    println!("{}", sc.get().unwrap()); // this will print "foo"
 }
 println!("{}", sc.get().unwrap()); // uh, oh
 ```
@@ -111,7 +112,7 @@ and for signaling to our `Sc` when the reference expires.
 Let's try to implement this.
 
 ```rust
-use core::marker::PhantomData;
+use std::marker::PhantomData;
 
 struct Dropper<'object, 'sc, T : 'object + 'sc> {
     sc : &'sc mut Sc<T>,
@@ -135,20 +136,20 @@ moment where we can notify `Sc` is when `Dropper` is dropped.
 So, let's implement `Drop` for `Dropper`.
 
 ```rust
-use core::ptr;
+use std::ptr;
 impl<'object, 'sc, T> Drop for Dropper<'object, 'sc, T> {
     fn drop(&mut self) {
-        *self.sc.val = ptr::null();
+        self.sc.val = ptr::null();
     }
 }
 
-impl<T> for Sc<T> {
+impl<T> Sc<T> {
     fn get<'a>(&'a self) -> Option<&'a T> {
         unsafe {
-            if ptr::eq(ptr::null(), self.val.get()) {
+            if ptr::eq(ptr::null(), self.val) {
                 None
             } else {
-                Some(mem::transmute(self.val.get()))
+                Some(mem::transmute(self.val))
             }
         }
     }
@@ -168,10 +169,10 @@ erasing its lifetime, so we need to modify it to introduce a dropper that will r
 Unfortunately, the following won't work:
 
 ```rust
-impl<T> for Sc<T> {
-    fn new<'object, 'sc, T>(val : &'object T) -> (Sc<T>, Dropper<'object 'sc, T>) {
+impl<T> Sc<T> {
+    fn new<'object, 'sc>(val : &'object T) -> (Sc<T>, Dropper<'object, 'sc, T>) {
         let sc = Sc { val : val as *const T};
-        (sc, Dropper { sc : &sc, PhantomData })
+        (sc, Dropper { sc : &mut sc, _phantom : PhantomData })
     }
 }
 ```
@@ -188,8 +189,8 @@ impl<T> for Sc<T> {
         Sc { val : ptr::null() }
     }
 
-    pub fn set<'sc, 'object>(&'sc mut self, val &'object T) -> Dropper<'object, 'sc, T> { 
-        *self.val = val as *const T;
+    pub fn set<'sc, 'object>(&'sc mut self, val : &'object T) -> Dropper<'object, 'sc, T> { 
+        self.val = val as *const T;
         Dropper { sc: self, _phantom: PhantomData }
     }
 }
@@ -242,7 +243,7 @@ To do so, we need to introduce interior mutability to our `Sc` struct.
 use std::marker::PhantomData;
 use std::mem;
 use std::cell::Cell;
-use core::ptr;
+use std::ptr;
 
 pub struct Sc<T> {
     val: Cell<*const T>,
