@@ -1,4 +1,4 @@
-**NOTE: This explanation is a bit outdated, please look at [the code](src/lib.rs) for the up-to-date version.**
+**NOTE: While still communicating the base idea behing Sc, this explanation is a bit outdated. Please look at [the code](src/lib.rs) for the up-to-date version of the type.**
 
 Type erasure is a known technique of object-oriented languages, where the knowledge of the actual type of an object is "erased" and replaced by a more generic one.
 This allows to trade a runtime check of the actual type (through a vtable, or a typeid) for a more homogeneous type, that can e.g. be stored in collections with other typed-erased objects.
