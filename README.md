@@ -1,19 +1,21 @@
 Schroedinger, An experimental library for references with erased lifetime, in Rust
 ==================================================================================
 
+**NOTE: Code in this repository is experimental, and known to be unsafe.**
+
 Type erasure is a known technique of object-oriented languages, where the knowledge of the actual type of an object is "erased" and replaced by a more generic one.
 This allows to trade a runtime check of the actual type (through a vtable, or a typeid) for a more homogeneous type, that can e.g. be stored in collections with other typed-erased objects.
 
 In Rust, type erasure is expressed under the form of [`dyn Trait`](https://doc.rust-lang.org/book/second-edition/ch17-02-trait-objects.html#using-trait-objects-that-allow-for-values-of-different-types).
 
-This repository starts as a thought experiment: *What is the lifetime equivalent to type erasure?*.
+This repository is inspired by a thought experiment: *What is the lifetime equivalent to type erasure?*.
 The easy answer would be [`Rc<T>`](https://doc.rust-lang.org/std/rc/index.html). After all, using `Rc`, you share ownership of a value, extending its lifetime dynamically through its reference count, as much as is needed.
 
 However, `Rc` has some runtime drawbacks: in particular, both its reference count and its inner type must be allocated. Also, `Rc` expresses shared *ownership*. But what about dynamic lifetime for *non-owning references*?
 
 Enters Schroedinger's cat. In the famous thought experiment, a cat is in a box, with a poisonous gas that can be released to kill the cat. There's a 50/50 probability that the gas be released, in which case, the cat will be dead. But the other 50% of the time, the cat will be alive. The only way to know is to open the box.
 
-I propose exactly the same mechanism for dynamically erased lifetimes: a new type `Sc<T>` (for *Schroedinger's cat*), that may contain either some reference, or none. The only way to know is to query it dynamically.
+I propose exactly the same mechanism for dynamically erased lifetimes: a new type `Sc<T>` (for *Schroedinger*), that may contain either some valid reference, or none, but doesn't expose its lifetime. The only way to know if the reference is still valid is to *open the box* and query it dynamically.
 
 A naive attempt
 ===============
