@@ -48,13 +48,10 @@ impl Visitable {
 
     pub fn add_log(&self, log: &str) {
         for observer in &self.observers {
-            match observer.get() {
-                Some(observer) => {
-                    println!("Notifying {}", &observer.name);
-                    observer.notify(log)
-                }
-                None => {}
-            }
+            observer.visit(|observer| {
+                println!("Notifying {}", &observer.name);
+                observer.notify(log)
+            });
         }
     }
 
@@ -65,7 +62,7 @@ impl Visitable {
         let sc = self
             .observers
             .iter()
-            .find(|observer| observer.get().is_none())?;
+            .find(|observer| observer.is_none())?;
         Some(sc.set(observer))
     }
 }

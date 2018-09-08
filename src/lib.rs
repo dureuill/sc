@@ -36,12 +36,23 @@ impl<T> Sc<T> {
         }
     }
 
-    pub fn get<'a>(&'a self) -> Option<&'a T> {
+    unsafe fn get<'a>(&'a self) -> Option<&'a T> {
+        if ptr::eq(ptr::null(), self.val.get()) {
+            None
+        } else {
+            Some(mem::transmute(self.val.get()))
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        ptr::eq(ptr::null(), self.val.get())
+    }
+
+    pub fn visit<'a, U, F: Fn(&'a T) -> U>(&'a self, f: F) -> Option<U> {
         unsafe {
-            if ptr::eq(ptr::null(), self.val.get()) {
-                None
-            } else {
-                Some(mem::transmute(self.val.get()))
+            match self.get() {
+                Some(x) => Some(f(x)),
+                None => None,
             }
         }
     }
@@ -54,12 +65,12 @@ mod tests {
     #[test]
     fn it_works() {
         let sc = Sc::new();
-        assert_eq!(sc.get(), None);
+        assert!(sc.is_none());
         {
             let s = String::from("foo");
             let _dropper = sc.set(&s);
-            assert_eq!(sc.get(), Some(&s));
+            assert!(!sc.is_none());
         }
-        assert_eq!(sc.get(), None);
+        assert!(sc.is_none());
     }
 }
