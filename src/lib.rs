@@ -1,35 +1,28 @@
-extern crate core;
-
-use core::ptr;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::mem;
 
-pub struct Sc<T> {
-    val: Cell<*const T>,
-}
+pub struct Sc<T : ?Sized>(Cell<Option<*const T>>);
 
 #[must_use]
-pub struct Dropper<'object, 'sc, T: 'object + 'sc> {
+pub struct Dropper<'object, 'sc, T: ?Sized + 'object + 'sc> {
     sc: &'sc Sc<T>,
     _phantom: PhantomData<&'object T>,
 }
 
-impl<'object, 'sc, T> Drop for Dropper<'object, 'sc, T> {
+impl<'object, 'sc, T : ?Sized> Drop for Dropper<'object, 'sc, T> {
     fn drop(&mut self) {
-        self.sc.val.set(ptr::null());
+        self.sc.0.set(None);
     }
 }
 
-impl<T> Sc<T> {
+impl<T : ?Sized> Sc<T> {
     pub fn new() -> Self {
-        Sc {
-            val: Cell::new(ptr::null()),
-        }
+        Sc { 0: Cell::new(None) }
     }
 
     pub fn set<'sc, 'object>(&'sc self, val: &'object T) -> Dropper<'object, 'sc, T> {
-        self.val.set(val as *const T);
+        self.0.set(Some(val as *const T));
         Dropper {
             sc: self,
             _phantom: PhantomData,
@@ -37,24 +30,15 @@ impl<T> Sc<T> {
     }
 
     unsafe fn get<'a>(&'a self) -> Option<&'a T> {
-        if ptr::eq(ptr::null(), self.val.get()) {
-            None
-        } else {
-            Some(mem::transmute(self.val.get()))
-        }
+        self.0.get().map(|val| mem::transmute(val))
     }
 
     pub fn is_none(&self) -> bool {
-        ptr::eq(ptr::null(), self.val.get())
+        self.0.get().is_none()
     }
 
     pub fn map<'a, U, F: Fn(&'a T) -> U>(&'a self, f: F) -> Option<U> {
-        unsafe {
-            match self.get() {
-                Some(x) => Some(f(x)),
-                None => None,
-            }
-        }
+        unsafe { self.get().map(|x| f(x)) }
     }
 }
 
