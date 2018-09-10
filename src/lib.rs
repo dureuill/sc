@@ -48,7 +48,7 @@ impl<T> Sc<T> {
         ptr::eq(ptr::null(), self.val.get())
     }
 
-    pub fn visit<'a, U, F: Fn(&'a T) -> U>(&'a self, f: F) -> Option<U> {
+    pub fn map<'a, U, F: Fn(&'a T) -> U>(&'a self, f: F) -> Option<U> {
         unsafe {
             match self.get() {
                 Some(x) => Some(f(x)),

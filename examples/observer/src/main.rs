@@ -48,7 +48,7 @@ impl Visitable {
 
     pub fn add_log(&self, log: &str) {
         for observer in &self.observers {
-            observer.visit(|observer| {
+            observer.map(|observer| {
                 println!("Notifying {}", &observer.name);
                 observer.notify(log)
             });
