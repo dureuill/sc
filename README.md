@@ -19,7 +19,7 @@ assert!(a.sc.is_none());
     let s = String::from("foo");
     let _dropper = a.sc.set(&s); // store a reference to s
     assert!(!a.sc.is_none());
-    a.sc.visit(|x| println!("{}", x)); // use the reference, prints "foo"
+    a.sc.map(|x| println!("{}", x)); // use the reference, prints "foo"
 }
 assert!(a.sc.is_none());
 ```
