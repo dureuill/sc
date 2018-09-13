@@ -1,6 +1,5 @@
 use std::cell::Cell;
 use std::mem;
-use std::ops::Deref;
 
 pub struct Sc<T>(Cell<Option<*const T>>);
 
@@ -14,33 +13,28 @@ impl<'sc, T> Drop for Dropper<'sc, T> {
     }
 }
 
-pub struct Wrapper<'sc, 'auto, T: 'sc + 'auto> {
-    data: T,
-    sc: Cell<Option<Dropper<'sc, T>>>,
-    autoref: Cell<Option<&'auto T>>,
+struct Marker;
+
+pub struct Locker<'sc, 'auto, T: 'sc + 'auto> {
+    sc: Option<Dropper<'sc, T>>,
+    marker: Marker,
+    autoref: Option<&'auto Marker>,
 }
 
-impl<'sc, 'auto, T> Deref for Wrapper<'sc, 'auto, T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<'sc, 'auto, T> Wrapper<'sc, 'auto, T> {
-    pub fn new(data: T) -> Self {
+impl<'sc, 'auto, T> Locker<'sc, 'auto, T> {
+    pub fn new() -> Self {
         Self {
-            data,
-            sc: Cell::new(None),
-            autoref: Cell::new(None),
+            sc: None,
+            marker: Marker,
+            autoref: None,
         }
     }
 
-    pub fn lock(this: &'auto Self, sc: &'sc Sc<T>) {
-        let ptr = &this.data as *const T;
+    pub fn lock(&'auto mut self, val: &'auto T, sc: &'sc Sc<T>) {
+        let ptr = val as *const T;
         sc.0.set(Some(ptr));
-        this.sc.set(Some(Dropper { sc }));
-        this.autoref.set(Some(&this.data));
+        self.sc = Some(Dropper { sc });
+        self.autoref = Some(&self.marker);
     }
 }
 
@@ -72,8 +66,17 @@ mod tests {
         assert!(sc.is_none());
         {
             let s = String::from("foo");
-            let s = Wrapper::new(s);
-            Wrapper::lock(&s, &sc);
+            {
+                let mut locker = Locker::new();
+                locker.lock(&s, &sc);
+                assert!(!sc.is_none());
+            }
+            assert!(sc.is_none());
+            {
+                let mut locker = Locker::new();
+                locker.lock(&s, &sc);
+                assert!(!sc.is_none());
+            }
             assert!(!sc.is_none());
         }
         assert!(sc.is_none());

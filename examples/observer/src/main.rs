@@ -1,6 +1,6 @@
 extern crate sc;
 
-use sc::Wrapper;
+use sc::Locker;
 use sc::Sc;
 use std::cell::RefCell;
 
@@ -57,13 +57,14 @@ impl Visitable {
 
     pub fn register_observer<'observer, 'sc>(
         &'sc self,
-        observer: &'observer Wrapper<'sc, 'observer, Observer>,
+        observer: &'observer Observer,
+        locker: &'observer mut Locker<'sc, 'observer, Observer>,
     ) -> Option<()> {
         let sc = self
             .observers
             .iter()
             .find(|observer| observer.is_none())?;
-        Some(Wrapper::lock(observer, &sc))
+        Some(locker.lock(observer, &sc))
     }
 }
 
@@ -71,12 +72,14 @@ fn main() {
     let visitable = Visitable::new(10);
     visitable.add_log("Lost for science!");
     {
-        let observer = Wrapper::new(Observer::new(String::from("Toto")));
-        visitable.register_observer(&observer);
+        let observer = Observer::new(String::from("Toto"));
+        let mut locker = Locker::new();
+        visitable.register_observer(&observer, &mut locker);
         visitable.add_log("Registered log");
         {
-            let observer = Wrapper::new(Observer::new(String::from("Titi")));
-            visitable.register_observer(&observer);
+            let observer = Observer::new(String::from("Titi"));
+            let mut locker = Locker::new();
+            visitable.register_observer(&observer, &mut locker);
             visitable.add_log("a second one");
             observer.print();
         }
