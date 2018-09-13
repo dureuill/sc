@@ -1,6 +1,6 @@
 extern crate sc;
 
-use sc::Dropper;
+use sc::Wrapper;
 use sc::Sc;
 use std::cell::RefCell;
 
@@ -57,13 +57,13 @@ impl Visitable {
 
     pub fn register_observer<'observer, 'sc>(
         &'sc self,
-        observer: &'observer Observer,
-    ) -> Option<Dropper<'observer, 'sc, Observer>> {
+        observer: &'observer Wrapper<'sc, 'observer, Observer>,
+    ) -> Option<()> {
         let sc = self
             .observers
             .iter()
             .find(|observer| observer.is_none())?;
-        Some(sc.set(observer))
+        Some(Wrapper::lock(observer, &sc))
     }
 }
 
@@ -71,12 +71,12 @@ fn main() {
     let visitable = Visitable::new(10);
     visitable.add_log("Lost for science!");
     {
-        let observer = Observer::new(String::from("Toto"));
-        let _dropper = visitable.register_observer(&observer).unwrap();
+        let observer = Wrapper::new(Observer::new(String::from("Toto")));
+        visitable.register_observer(&observer);
         visitable.add_log("Registered log");
         {
-            let observer = Observer::new(String::from("Titi"));
-            let _dropper = visitable.register_observer(&observer).unwrap();
+            let observer = Wrapper::new(Observer::new(String::from("Titi")));
+            visitable.register_observer(&observer);
             visitable.add_log("a second one");
             observer.print();
         }

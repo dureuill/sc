@@ -1,44 +1,64 @@
 use std::cell::Cell;
-use std::marker::PhantomData;
 use std::mem;
+use std::ops::Deref;
 
-pub struct Sc<T : ?Sized>(Cell<Option<*const T>>);
+pub struct Sc<T>(Cell<Option<*const T>>);
 
-#[must_use]
-pub struct Dropper<'object, 'sc, T: ?Sized + 'object + 'sc> {
+struct Dropper<'sc, T: 'sc> {
     sc: &'sc Sc<T>,
-    _phantom: PhantomData<&'object T>,
 }
 
-impl<'object, 'sc, T : ?Sized> Drop for Dropper<'object, 'sc, T> {
+impl<'sc, T> Drop for Dropper<'sc, T> {
     fn drop(&mut self) {
-        self.sc.0.set(None);
+        self.sc.0.set(None)
     }
 }
 
-impl<T : ?Sized> Sc<T> {
-    pub fn new() -> Self {
-        Sc { 0: Cell::new(None) }
-    }
+pub struct Wrapper<'sc, 'auto, T: 'sc + 'auto> {
+    data: T,
+    sc: Cell<Option<Dropper<'sc, T>>>,
+    autoref: Cell<Option<&'auto T>>,
+}
 
-    pub fn set<'sc, 'object>(&'sc self, val: &'object T) -> Dropper<'object, 'sc, T> {
-        self.0.set(Some(val as *const T));
-        Dropper {
-            sc: self,
-            _phantom: PhantomData,
+impl<'sc, 'auto, T> Deref for Wrapper<'sc, 'auto, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<'sc, 'auto, T> Wrapper<'sc, 'auto, T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            data,
+            sc: Cell::new(None),
+            autoref: Cell::new(None),
         }
     }
 
-    unsafe fn get<'a>(&'a self) -> Option<&'a T> {
-        self.0.get().map(|val| mem::transmute(val))
+    pub fn lock(this: &'auto Self, sc: &'sc Sc<T>) {
+        let ptr = &this.data as *const T;
+        sc.0.set(Some(ptr));
+        this.sc.set(Some(Dropper { sc }));
+        this.autoref.set(Some(&this.data));
+    }
+}
+
+impl<T> Sc<T> {
+    pub fn new() -> Self {
+        Self { 0: Cell::new(None) }
+    }
+
+    unsafe fn get(&self) -> Option<&T> {
+        self.0.get().map(|ptr| mem::transmute(ptr))
+    }
+
+    pub fn map<U, F: Fn(&T) -> U>(&self, f: F) -> Option<U> {
+        unsafe { self.get().map(f) }
     }
 
     pub fn is_none(&self) -> bool {
-        self.0.get().is_none()
-    }
-
-    pub fn map<'a, U, F: Fn(&'a T) -> U>(&'a self, f: F) -> Option<U> {
-        unsafe { self.get().map(|x| f(x)) }
+        unsafe { self.get().is_none() }
     }
 }
 
@@ -52,7 +72,8 @@ mod tests {
         assert!(sc.is_none());
         {
             let s = String::from("foo");
-            let _dropper = sc.set(&s);
+            let s = Wrapper::new(s);
+            Wrapper::lock(&s, &sc);
             assert!(!sc.is_none());
         }
         assert!(sc.is_none());
