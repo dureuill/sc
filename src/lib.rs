@@ -56,6 +56,39 @@ impl<T> Sc<T> {
     }
 }
 
+pub struct Wrapper<'sc, 'auto, T: 'sc + 'auto> {
+    locker: Locker<'sc, 'auto, T>,
+    data: T,
+}
+
+impl<'sc, 'auto, T> Wrapper<'sc, 'auto, T> {
+    pub fn new(data: T) -> Self {
+        Self {
+            locker: Locker::new(),
+            data,
+        }
+    }
+
+    pub fn lock(this: &'auto mut Self, sc: &'sc Sc<T>) {
+        this.locker.lock(&this.data, sc);
+    }
+}
+
+use std::ops::Deref;
+use std::ops::DerefMut;
+impl<'sc, 'auto, T> Deref for Wrapper<'sc, 'auto, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<'sc, 'auto, T> DerefMut for Wrapper<'sc, 'auto, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,6 +110,22 @@ mod tests {
                 locker.lock(&s, &sc);
                 assert!(!sc.is_none());
             }
+            assert!(sc.is_none());
+        }
+        assert!(sc.is_none());
+    }
+
+    #[test]
+    fn with_wrapper() {
+        let sc = Sc::new();
+        assert!(sc.is_none());
+        {
+            let mut s = Wrapper::new(String::from("bar"));
+            {
+                Wrapper::lock(&mut s, &sc);
+                assert!(!sc.is_none());
+            }
+            // actually here we are still locked because a wrapper automatically locks for its whole lifetime
             assert!(!sc.is_none());
         }
         assert!(sc.is_none());
