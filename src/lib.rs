@@ -1,5 +1,4 @@
 use std::cell::Cell;
-use std::mem;
 
 pub struct Sc<T>(Cell<Option<*const T>>);
 
@@ -44,7 +43,7 @@ impl<T> Sc<T> {
     }
 
     unsafe fn get(&self) -> Option<&T> {
-        self.0.get().map(|ptr| mem::transmute(ptr))
+        self.0.get().map(|ptr| &*ptr)
     }
 
     pub fn map<U, F: Fn(&T) -> U>(&self, f: F) -> Option<U> {
