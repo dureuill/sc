@@ -51,7 +51,7 @@ impl<T> Sc<T> {
     }
 
     pub fn is_none(&self) -> bool {
-        unsafe { self.get().is_none() }
+        self.0.get().is_none()
     }
 }
 
