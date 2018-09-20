@@ -50,6 +50,10 @@ impl<T: ?Sized> Sc<T> {
         unsafe { self.get().map(f) }
     }
 
+    pub fn is_some(&self) -> bool {
+        self.0.get().is_some()
+    }
+
     pub fn is_none(&self) -> bool {
         self.0.get().is_none()
     }
