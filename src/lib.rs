@@ -1,12 +1,12 @@
 use std::cell::Cell;
 
-pub struct Sc<T>(Cell<Option<*const T>>);
+pub struct Sc<T: ?Sized>(Cell<Option<*const T>>);
 
-struct Dropper<'sc, T: 'sc> {
+struct Dropper<'sc, T: ?Sized + 'sc> {
     sc: &'sc Sc<T>,
 }
 
-impl<'sc, T> Drop for Dropper<'sc, T> {
+impl<'sc, T: ?Sized> Drop for Dropper<'sc, T> {
     fn drop(&mut self) {
         self.sc.0.set(None)
     }
@@ -14,13 +14,13 @@ impl<'sc, T> Drop for Dropper<'sc, T> {
 
 struct Marker;
 
-pub struct Locker<'sc, 'auto, T: 'sc + 'auto> {
+pub struct Locker<'sc, 'auto, T: ?Sized + 'sc + 'auto> {
     sc: Option<Dropper<'sc, T>>,
     marker: Marker,
     autoref: Option<&'auto Marker>,
 }
 
-impl<'sc, 'auto, T> Locker<'sc, 'auto, T> {
+impl<'sc, 'auto, T: ?Sized> Locker<'sc, 'auto, T> {
     pub fn new() -> Self {
         Self {
             sc: None,
@@ -37,7 +37,7 @@ impl<'sc, 'auto, T> Locker<'sc, 'auto, T> {
     }
 }
 
-impl<T> Sc<T> {
+impl<T: ?Sized> Sc<T> {
     pub fn new() -> Self {
         Self { 0: Cell::new(None) }
     }
