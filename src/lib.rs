@@ -29,7 +29,7 @@ impl<'sc, 'auto, T: ?Sized> Locker<'sc, 'auto, T> {
         }
     }
 
-    pub fn lock(&'auto mut self, val: &'auto T, sc: &'sc Sc<T>) {
+    pub unsafe fn lock(&'auto mut self, val: &'auto T, sc: &'sc Sc<T>) {
         let ptr = val as *const T;
         sc.0.set(Some(ptr));
         self.sc = Some(Dropper { sc });
@@ -72,7 +72,7 @@ impl<'sc, 'auto, T> Wrapper<'sc, 'auto, T> {
         }
     }
 
-    pub fn lock(this: &'auto mut Self, sc: &'sc Sc<T>) {
+    pub unsafe fn lock(this: &'auto mut Self, sc: &'sc Sc<T>) {
         this.locker.lock(&this.data, sc);
     }
 }
@@ -104,13 +104,17 @@ mod tests {
             let s = String::from("foo");
             {
                 let mut locker = Locker::new();
-                locker.lock(&s, &sc);
+                unsafe {
+                    locker.lock(&s, &sc);
+                }
                 assert!(!sc.is_none());
             }
             assert!(sc.is_none());
             {
                 let mut locker = Locker::new();
-                locker.lock(&s, &sc);
+                unsafe {
+                    locker.lock(&s, &sc);
+                }
                 assert!(!sc.is_none());
             }
             assert!(sc.is_none());
@@ -125,7 +129,9 @@ mod tests {
         {
             let mut s = Wrapper::new(String::from("bar"));
             {
-                Wrapper::lock(&mut s, &sc);
+                unsafe {
+                    Wrapper::lock(&mut s, &sc);
+                }
                 assert!(!sc.is_none());
             }
             // actually here we are still locked because a wrapper automatically locks for its whole lifetime
